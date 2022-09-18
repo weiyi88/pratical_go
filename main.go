@@ -1,47 +1,45 @@
 package main
 
+// import 这里我习惯把官方库，开源库，本地module依次分开列出
 import (
+	"errors"
+	"log"
+
 	"github.com/gin-gonic/gin"
-	"net/http"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
+	"gin_demo/config"
+	"gin_demo/connect/db"
+	"gin_demo/router"
 )
 
-func sayHello(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "hello goland",
-	})
-}
+var (
+	conf = pflag.StringP("config", "c", "", "config filepath")
+)
 
 func main() {
-	r := gin.Default()
+	pflag.Parse()
 
-	r.GET("/hello", sayHello)
+	// 初始化配置
+	if err := config.Run(*conf); err != nil {
+		panic(err)
+	}
 
-	// json 返回数据
-	r.GET("/json", func(c *gin.Context) {
-		// 使用map
-		data := map[string]interface{}{
-			"name":  "Aring",
-			"age":   25,
-			"point": "handsome",
-		}
-		c.JSON(http.StatusOK, data)
-	})
+	// 连接mysql数据库
+	btn := db.GetInstance().InitPool()
+	if !btn {
+		log.Println("init database pool failure...")
+		panic(errors.New("init database pool failure"))
+	}
 
-	// 使用struct
-	r.GET("struct", func(c *gin.Context) {
-		monster := struct {
-			Name  string `json:"name"`
-			Age   int    `json:"age"`
-			Point string `json:"adfsadf"`
-		}{
-			"彭绮文",
-			24,
-			"normal",
-		}
-		c.JSON(http.StatusOK, monster)
-	})
+	// redis
+	db.InitRedis()
 
-	err := r.Run(":9000")
+	gin.SetMode(viper.GetString("mode"))
+	g := gin.New()
+	g = router.Load(g)
+	err := g.Run(viper.GetString("addr"))
 	if err != nil {
 		return
 	}
