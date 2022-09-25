@@ -3,7 +3,9 @@ package main
 // import 这里我习惯把官方库，开源库，本地module依次分开列出
 import (
 	"errors"
-	"log"
+	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/pflag"
@@ -11,6 +13,7 @@ import (
 
 	"gin_demo/config"
 	"gin_demo/connect/db"
+	"gin_demo/logger"
 	"gin_demo/router"
 )
 
@@ -26,12 +29,12 @@ func main() {
 		panic(err)
 	}
 
+	// logger.Info("i'm log123-----Info")
+	// logger.Error("i'm log123-----Error")
+
 	// 连接mysql数据库
-	btn := db.GetInstance().InitPool()
-	if !btn {
-		log.Println("init database pool failure...")
-		panic(errors.New("init database pool failure"))
-	}
+	DB := db.GetDB()
+	defer db.CloseDB(DB)
 
 	// redis
 	db.InitRedis()
@@ -39,8 +42,33 @@ func main() {
 	gin.SetMode(viper.GetString("mode"))
 	g := gin.New()
 	g = router.Load(g)
-	err := g.Run(viper.GetString("addr"))
-	if err != nil {
-		return
+
+	// g.Run(viper.GetString("addr"))
+
+	go func() {
+		if err := pingServer(); err != nil {
+			fmt.Println("fail:健康检测失败", err)
+		}
+		fmt.Println("success:健康检测成功")
+	}()
+
+	logger.Info("启动http服务端口%s\n", viper.GetString("addr"))
+
+	if err := graceful.ListenAndServe(viper.GetString("addr"), g); err != nil && err != http.ErrServerClosed {
+		logger.Error("fail:http服务启动失败: %s\n", err)
 	}
+}
+
+// 健康检查
+func pingServer() error {
+	for i := 0; i < viper.GetInt("max_ping_count"); i++ {
+		url := fmt.Sprintf("%s%s%s", "http://127.0.0.1", viper.GetString("addr"), viper.GetString("healthCheck"))
+		fmt.Println(url)
+		resp, err := http.Get(url)
+		if err == nil && resp.StatusCode == 200 {
+			return nil
+		}
+		time.Sleep(time.Second)
+	}
+	return errors.New("健康检测404")
 }
