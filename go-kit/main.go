@@ -29,8 +29,16 @@ func main() {
 		transport.DecodeRequest,
 		transport.EncodeResponse,
 	)
+
+	test := httpTransport.NewServer(
+		endpoint.TryTest(s),
+		transport.DecodeRequest,
+		transport.EncodeResponse,
+	)
+
 	http.Handle("/add", add)
 	http.Handle("/reduce", reduce)
 	http.Handle("/multi", multi)
+	http.Handle("/test", test)
 	http.ListenAndServe(":9009", nil)
 }

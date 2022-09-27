@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"context"
+	"fmt"
 	"gin_demo/go-kit/service"
 	"github.com/go-kit/kit/endpoint"
 )
@@ -14,6 +15,11 @@ type Request struct {
 type Res struct {
 	Res int   `json:"res"`
 	Err error `json:"err"`
+}
+
+type Test struct {
+	Msg  int `json:"message" form:"message"`
+	Code int `json:"code" form:":code"`
 }
 
 func MakeAddEndpoint(s service.CalculateService) endpoint.Endpoint {
@@ -38,6 +44,16 @@ func MakeMultiEndpoint(s service.CalculateService) endpoint.Endpoint {
 		req := request.(Request)
 		return Res{
 			Res: s.Mulit(req.A, req.B),
+		}, nil
+	}
+}
+
+func TryTest(s service.CalculateService) endpoint.Endpoint {
+	return func(_ context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(Request)
+		fmt.Println(req)
+		return Res{
+			Res: s.Test(req.A, req.B),
 		}, nil
 	}
 }
